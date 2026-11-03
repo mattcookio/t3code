@@ -105,15 +105,13 @@ function validateStatus(
   return Effect.succeed(status);
 }
 
-function relayAccountId(clerkToken: string): Option.Option<string> {
-  try {
-    return Option.fromNullishOr(decodeRelayJwt(clerkToken).sub).pipe(
-      Option.filter((subject) => subject.length > 0),
-    );
-  } catch {
-    return Option.none();
-  }
-}
+const relayAccountId = (clerkToken: string) =>
+  decodeRelayJwt(clerkToken).pipe(
+    Effect.map(({ sub }) =>
+      typeof sub === "string" && sub.length > 0 ? Option.some(sub) : Option.none<string>(),
+    ),
+    Effect.orElseSucceed(() => Option.none<string>()),
+  );
 
 /** @public */
 export const make = Effect.fn("RelayEnvironmentDiscovery.make")(function* () {
@@ -258,7 +256,7 @@ export const make = Effect.fn("RelayEnvironmentDiscovery.make")(function* () {
       if ((yield* Ref.get(accountGeneration)) !== generation) {
         return;
       }
-      const accountId = relayAccountId(clerkToken);
+      const accountId = yield* relayAccountId(clerkToken);
       const previousAccountId = yield* Ref.get(activeAccountId);
       if (
         Option.isSome(previousAccountId) &&
